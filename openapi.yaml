@@ -1,0 +1,373 @@
+openapi: 3.0.3
+
+info:
+  title: Microsserviço de Categorização de Produtos
+  version: v1
+  description: >
+    API responsável pelo gerenciamento de categorias de produtos do sistema Plus.
+    Permite criar e manter categorias, incluindo subcategorias (hierarquia).
+    A associação entre produtos e categorias é responsabilidade do MS de produtos.
+  contact:
+    name: Grupo 05 - ES2
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:3002
+    description: Ambiente local (Docker / dev)
+  - url: http://localhost:3002/categorizacao
+    description: Via API Gateway (ministack)
+
+tags:
+  - name: Categorias
+    description: CRUD de categorias de produtos
+
+# Exige JWT Bearer (emitido pelo ms-auth) em todos os endpoints por padrão.
+security:
+  - bearerAuth: []
+
+paths:
+  /categorias:
+    get:
+      tags: [Categorias]
+      summary: Lista categorias
+      description: Retorna as categorias de forma paginada, com filtros opcionais.
+      operationId: listarCategorias
+      parameters:
+        - name: nome
+          in: query
+          description: Filtra por nome (busca parcial, case-insensitive).
+          required: false
+          schema:
+            type: string
+        - name: ativo
+          in: query
+          description: Filtra por status (ativas/inativas).
+          required: false
+          schema:
+            type: boolean
+        - name: categoriaPaiId
+          in: query
+          description: Lista apenas subcategorias diretas da categoria informada.
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: Categorias retornadas com sucesso.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoriaPage'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+
+    post:
+      tags: [Categorias]
+      summary: Cria uma nova categoria
+      description: Apenas usuários com perfil ADMIN podem criar categorias.
+      operationId: criarCategoria
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoriaRequest'
+      responses:
+        '201':
+          description: Categoria criada com sucesso.
+          headers:
+            Location:
+              description: URI da categoria recém-criada.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoriaResponse'
+        '400':
+          $ref: '#/components/responses/DadosInvalidos'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '403':
+          $ref: '#/components/responses/SemPermissao'
+        '409':
+          $ref: '#/components/responses/Conflito'
+
+  /categorias/{id}:
+    parameters:
+      - $ref: '#/components/parameters/CategoriaId'
+    get:
+      tags: [Categorias]
+      summary: Busca uma categoria por ID
+      operationId: buscarCategoria
+      responses:
+        '200':
+          description: Categoria encontrada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoriaResponse'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          $ref: '#/components/responses/NaoEncontrado'
+
+    put:
+      tags: [Categorias]
+      summary: Atualiza uma categoria (completa)
+      description: Substitui todos os campos da categoria. Requer perfil ADMIN.
+      operationId: atualizarCategoria
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoriaRequest'
+      responses:
+        '200':
+          description: Categoria atualizada com sucesso.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoriaResponse'
+        '400':
+          $ref: '#/components/responses/DadosInvalidos'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '403':
+          $ref: '#/components/responses/SemPermissao'
+        '404':
+          $ref: '#/components/responses/NaoEncontrado'
+
+    patch:
+      tags: [Categorias]
+      summary: Atualização parcial de uma categoria
+      description: >
+        Atualiza apenas os campos enviados. Campos nulos/ausentes são ignorados.
+        Requer perfil ADMIN.
+      operationId: atualizarParcialCategoria
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoriaPatchRequest'
+      responses:
+        '200':
+          description: Categoria atualizada com sucesso.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoriaResponse'
+        '400':
+          $ref: '#/components/responses/DadosInvalidos'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '403':
+          $ref: '#/components/responses/SemPermissao'
+        '404':
+          $ref: '#/components/responses/NaoEncontrado'
+
+    delete:
+      tags: [Categorias]
+      summary: Remove uma categoria
+      description: Requer perfil ADMIN. Não é possível remover categoria com subcategorias.
+      operationId: removerCategoria
+      responses:
+        '204':
+          description: Categoria removida com sucesso.
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '403':
+          $ref: '#/components/responses/SemPermissao'
+        '404':
+          $ref: '#/components/responses/NaoEncontrado'
+        '409':
+          $ref: '#/components/responses/Conflito'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token JWT emitido pelo Microsserviço de Autenticação (ms-auth).
+
+  parameters:
+    CategoriaId:
+      name: id
+      in: path
+      required: true
+      description: Identificador da categoria.
+      schema:
+        type: integer
+        format: int64
+    Page:
+      name: page
+      in: query
+      description: Número da página (base 0).
+      required: false
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    Size:
+      name: size
+      in: query
+      description: Quantidade de itens por página.
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+  schemas:
+    CategoriaRequest:
+      type: object
+      required: [nome]
+      properties:
+        nome:
+          type: string
+          minLength: 2
+          maxLength: 80
+          example: Camisetas
+        descricao:
+          type: string
+          maxLength: 255
+          example: Camisetas de manga curta e longa
+        ativo:
+          type: boolean
+          default: true
+          example: true
+        categoriaPaiId:
+          type: integer
+          format: int64
+          nullable: true
+          description: ID da categoria pai (para subcategorias). Null = categoria raiz.
+          example: null
+
+    CategoriaPatchRequest:
+      type: object
+      description: Todos os campos são opcionais; somente os enviados são alterados.
+      properties:
+        nome:
+          type: string
+          minLength: 2
+          maxLength: 80
+        descricao:
+          type: string
+          maxLength: 255
+        ativo:
+          type: boolean
+        categoriaPaiId:
+          type: integer
+          format: int64
+          nullable: true
+
+    CategoriaResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        nome:
+          type: string
+          example: Camisetas
+        descricao:
+          type: string
+          example: Camisetas de manga curta e longa
+        ativo:
+          type: boolean
+          example: true
+        categoriaPaiId:
+          type: integer
+          format: int64
+          nullable: true
+          example: null
+        criadoEm:
+          type: string
+          format: date-time
+          example: '2026-06-02T14:30:00Z'
+        atualizadoEm:
+          type: string
+          format: date-time
+          example: '2026-06-02T14:30:00Z'
+
+    CategoriaPage:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/CategoriaResponse'
+        page:
+          type: integer
+          example: 0
+        size:
+          type: integer
+          example: 20
+        totalElements:
+          type: integer
+          format: int64
+          example: 42
+        totalPages:
+          type: integer
+          example: 3
+
+    Erro:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          example: '2026-06-02T14:30:00Z'
+        status:
+          type: integer
+          example: 400
+        error:
+          type: string
+          example: Bad Request
+        message:
+          type: string
+          example: O campo 'nome' é obrigatório.
+        path:
+          type: string
+          example: /categorias
+
+  responses:
+    DadosInvalidos:
+      description: Requisição malformada ou validação de campos falhou.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Erro'
+    NaoAutenticado:
+      description: Token ausente, inválido ou expirado.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Erro'
+    SemPermissao:
+      description: Usuário autenticado mas sem perfil ADMIN.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Erro'
+    NaoEncontrado:
+      description: Recurso não encontrado.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Erro'
+    Conflito:
+      description: "Conflito de estado (ex.: nome duplicado ou categoria com dependências)."
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Erro'

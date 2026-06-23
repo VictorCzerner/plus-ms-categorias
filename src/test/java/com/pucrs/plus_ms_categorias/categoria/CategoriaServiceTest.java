@@ -224,4 +224,116 @@ class CategoriaServiceTest {
             assertThat(response.getAtivo()).isTrue();
         }
     }
+
+    @Nested
+    @DisplayName("atualizar()")
+    class Atualizar {
+
+        @Test
+        @DisplayName("deve atualizar categoria com sucesso")
+        void deveAtualizarCategoriaComSucesso() {
+            var request = new CategoriaRequest();
+            request.setNome("Camisetas Atualizadas");
+            request.setDescricao("Nova descrição");
+            request.setAtivo(false);
+
+            when(categoriaRepository.findByIdWithPai(1L)).thenReturn(Optional.of(categoriaExistente));
+            when(categoriaRepository.existsByNomeAndIdNot("Camisetas Atualizadas", 1L)).thenReturn(false);
+            when(categoriaRepository.save(any(Categoria.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            CategoriaResponse response = categoriaService.atualizar(1L, request);
+
+            assertThat(response.getNome()).isEqualTo("Camisetas Atualizadas");
+            assertThat(response.getDescricao()).isEqualTo("Nova descrição");
+            assertThat(response.getAtivo()).isFalse();
+            verify(categoriaRepository).save(categoriaExistente);
+        }
+
+        @Test
+        @DisplayName("deve lançar RecursoNaoEncontradoException quando categoria não existe")
+        void deveLancarExcecaoQuandoCategoriaNaoExiste() {
+            var request = new CategoriaRequest();
+            request.setNome("Novo Nome");
+
+            when(categoriaRepository.findByIdWithPai(99L)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> categoriaService.atualizar(99L, request))
+                    .isInstanceOf(RecursoNaoEncontradoException.class)
+                    .hasMessageContaining("99");
+        }
+
+        @Test
+        @DisplayName("deve lançar ConflitoException quando nome já existe em outra categoria")
+        void deveLancarExcecaoQuandoNomeDuplicadoEmOutraCategoria() {
+            var request = new CategoriaRequest();
+            request.setNome("Camisetas");
+
+            when(categoriaRepository.findByIdWithPai(1L)).thenReturn(Optional.of(categoriaExistente));
+            when(categoriaRepository.existsByNomeAndIdNot("Camisetas", 1L)).thenReturn(true);
+
+            assertThatThrownBy(() -> categoriaService.atualizar(1L, request))
+                    .isInstanceOf(ConflitoException.class)
+                    .hasMessageContaining("Camisetas");
+
+            verify(categoriaRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("deve lançar ConflitoException quando categoria tenta ser pai dela mesma")
+        void deveLancarExcecaoQuandoCategoriaForPaiDelaMesma() {
+            var request = new CategoriaRequest();
+            request.setNome("Camisetas");
+            request.setCategoriaPaiId(1L);
+
+            when(categoriaRepository.findByIdWithPai(1L)).thenReturn(Optional.of(categoriaExistente));
+            when(categoriaRepository.existsByNomeAndIdNot("Camisetas", 1L)).thenReturn(false);
+
+            assertThatThrownBy(() -> categoriaService.atualizar(1L, request))
+                    .isInstanceOf(ConflitoException.class)
+                    .hasMessageContaining("pai dela mesma");
+
+            verify(categoriaRepository, never()).save(any());
+        }
+    }
+
+    @Nested
+    @DisplayName("remover()")
+    class Remover {
+
+        @Test
+        @DisplayName("deve remover categoria sem subcategorias")
+        void deveRemoverCategoriaSemSubcategorias() {
+            when(categoriaRepository.findByIdWithPai(1L)).thenReturn(Optional.of(categoriaExistente));
+            when(categoriaRepository.existsByCategoriaPaiId(1L)).thenReturn(false);
+
+            categoriaService.remover(1L);
+
+            verify(categoriaRepository).delete(categoriaExistente);
+        }
+
+        @Test
+        @DisplayName("deve lançar ConflitoException quando categoria possui subcategorias")
+        void deveLancarExcecaoQuandoCategoriaPossuiSubcategorias() {
+            when(categoriaRepository.findByIdWithPai(1L)).thenReturn(Optional.of(categoriaExistente));
+            when(categoriaRepository.existsByCategoriaPaiId(1L)).thenReturn(true);
+
+            assertThatThrownBy(() -> categoriaService.remover(1L))
+                    .isInstanceOf(ConflitoException.class)
+                    .hasMessageContaining("subcategorias");
+
+            verify(categoriaRepository, never()).delete(any());
+        }
+
+        @Test
+        @DisplayName("deve lançar RecursoNaoEncontradoException ao remover categoria inexistente")
+        void deveLancarExcecaoAoRemoverCategoriaInexistente() {
+            when(categoriaRepository.findByIdWithPai(99L)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> categoriaService.remover(99L))
+                    .isInstanceOf(RecursoNaoEncontradoException.class)
+                    .hasMessageContaining("99");
+
+            verify(categoriaRepository, never()).delete(any());
+        }
+    }
 }

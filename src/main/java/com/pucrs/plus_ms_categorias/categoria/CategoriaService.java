@@ -50,8 +50,47 @@ public class CategoriaService {
         return CategoriaResponse.from(categoriaRepository.save(categoria));
     }
 
+    @Transactional
+    public CategoriaResponse atualizar(Long id, CategoriaRequest request) {
+        Categoria categoria = buscarEntidadePorId(id);
+
+        if (categoriaRepository.existsByNomeAndIdNot(request.getNome(), id)) {
+            throw new ConflitoException("Já existe uma categoria com o nome '" + request.getNome() + "'.");
+        }
+
+        categoria.setNome(request.getNome());
+        categoria.setDescricao(request.getDescricao());
+        categoria.setAtivo(request.getAtivo() != null ? request.getAtivo() : true);
+        categoria.setCategoriaPai(resolverCategoriaPai(request.getCategoriaPaiId(), id));
+
+        return CategoriaResponse.from(categoriaRepository.save(categoria));
+    }
+
+    @Transactional
+    public void remover(Long id) {
+        Categoria categoria = buscarEntidadePorId(id);
+
+        if (categoriaRepository.existsByCategoriaPaiId(id)) {
+            throw new ConflitoException("Não é possível remover categoria com subcategorias.");
+        }
+
+        categoriaRepository.delete(categoria);
+    }
+
+    private Categoria buscarEntidadePorId(Long id) {
+        return categoriaRepository.findByIdWithPai(id)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Categoria não encontrada com id: " + id));
+    }
+
     private Categoria resolverCategoriaPai(Long categoriaPaiId) {
+        return resolverCategoriaPai(categoriaPaiId, null);
+    }
+
+    private Categoria resolverCategoriaPai(Long categoriaPaiId, Long categoriaId) {
         if (categoriaPaiId == null) return null;
+        if (categoriaPaiId.equals(categoriaId)) {
+            throw new ConflitoException("Uma categoria não pode ser pai dela mesma.");
+        }
         return categoriaRepository.findById(categoriaPaiId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException(
                         "Categoria pai não encontrada com id: " + categoriaPaiId

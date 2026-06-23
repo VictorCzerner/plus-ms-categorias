@@ -46,4 +46,20 @@ public class CategoriaController {
 
         return ResponseEntity.created(location).body(response);
     }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<CategoriaResponse> atualizar(
+            @PathVariable Long id,
+            @RequestBody @Valid CategoriaRequest request
+    ) {
+        return ResponseEntity.ok(categoriaService.atualizar(id, request));
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> remover(@PathVariable Long id) {
+        categoriaService.remover(id);
+        return ResponseEntity.noContent().build();
+    }
 }

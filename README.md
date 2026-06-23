@@ -8,6 +8,55 @@ Responsável por gerenciar as **categorias de produtos** (CRUD), incluindo hiera
 
 **Em desenvolvimento.** Etapa atual: **definição do contrato da API** (design-first com OpenAPI/Swagger). A implementação do backend Spring Boot ainda não foi iniciada.
 
+## Autenticação
+
+Este serviço valida JWT Bearer emitido pelo [`plus-ms-auth`](https://github.com/luizarosit0/plus-ms-auth).
+
+Configure o mesmo segredo usado pelo auth:
+
+```powershell
+$env:JWT_SECRET="dev-secret"
+```
+
+Em ambiente local, `dev-secret` é o valor padrão para compatibilidade com o `plus-ms-auth`, mas em outros ambientes defina `JWT_SECRET` explicitamente.
+
+Regras de acesso:
+
+| Método | Rota | Permissão |
+|---|---|---|
+| `GET` | `/categorias` | Usuário autenticado |
+| `GET` | `/categorias/{id}` | Usuário autenticado |
+| `POST` | `/categorias` | ADMIN |
+| `PUT` | `/categorias/{id}` | ADMIN |
+| `PATCH` | `/categorias/{id}` | ADMIN |
+| `DELETE` | `/categorias/{id}` | ADMIN |
+
+Para obter um token, execute o `plus-ms-auth` e chame o login:
+
+```powershell
+$login = Invoke-RestMethod -Method Post `
+  -Uri http://localhost:3001/auth/login `
+  -ContentType "application/json" `
+  -Body '{"email":"admindev@admin.com","password":"Senha123"}'
+
+$token = $login.access_token
+```
+
+Exemplo de GET autenticado:
+
+```powershell
+curl.exe -H "Authorization: Bearer $token" http://localhost:3002/categorias
+```
+
+Exemplo de POST como ADMIN:
+
+```powershell
+curl.exe -X POST http://localhost:3002/categorias `
+  -H "Authorization: Bearer $token" `
+  -H "Content-Type: application/json" `
+  -d "{\"nome\":\"Calças\",\"descricao\":\"Calças jeans e sociais\",\"ativo\":true}"
+```
+
 ## Contrato da API (Swagger / OpenAPI)
 
 A API foi modelada **design-first**: o contrato é escrito antes do código e é a fonte da verdade do serviço.

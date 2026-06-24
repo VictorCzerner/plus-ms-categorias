@@ -1,0 +1,47 @@
+services:
+  categorias-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: categorias
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - categorias-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d categorias"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  plus-ms-categorias:
+    build:
+      context: .
+    image: plus-ms-categorias:local
+    depends_on:
+      categorias-db:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://categorias-db:5432/categorias
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      JWT_SECRET: ${JWT_SECRET:-dev-secret}
+    ports:
+      - "3002:3002"
+
+  localstack:
+    image: localstack/localstack:3
+    profiles:
+      - localstack
+    environment:
+      SERVICES: ${LOCALSTACK_SERVICES:-s3,sqs,sns}
+      DEFAULT_REGION: ${AWS_REGION:-us-east-1}
+    ports:
+      - "4566:4566"
+    volumes:
+      - localstack-data:/var/lib/localstack
+
+volumes:
+  categorias-db-data:
+  localstack-data:

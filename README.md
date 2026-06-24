@@ -57,6 +57,50 @@ curl.exe -X POST http://localhost:3002/categorias `
   -d "{\"nome\":\"Calças\",\"descricao\":\"Calças jeans e sociais\",\"ativo\":true}"
 ```
 
+## Ambiente Local Com Docker Compose
+
+O projeto possui `docker-compose.yml` para executar um ambiente local reproduzível com:
+
+* `plus-ms-categorias`;
+* PostgreSQL do serviço de categorias;
+* LocalStack opcional para o ambiente Ministack/LocalStack.
+
+Para subir o microsserviço e o banco:
+
+```powershell
+$env:JWT_SECRET="dev-secret"
+docker compose up --build
+```
+
+A API fica disponível em:
+
+```text
+http://localhost:3002
+```
+
+O Compose injeta as variáveis de banco usadas pela aplicação:
+
+```text
+DB_URL=jdbc:postgresql://categorias-db:5432/categorias
+DB_USER=postgres
+DB_PASSWORD=postgres
+JWT_SECRET=dev-secret
+```
+
+Para subir também o LocalStack:
+
+```powershell
+docker compose --profile localstack up --build
+```
+
+Este microsserviço não utiliza serviços AWS diretamente no código atual; por isso o LocalStack não é dependência obrigatória do `plus-ms-categorias`. Ele fica disponível no Compose para manter o ambiente compatível com uma execução Ministack/LocalStack quando necessário.
+
+Para parar e remover os containers:
+
+```powershell
+docker compose down
+```
+
 ## Contrato da API (Swagger / OpenAPI)
 
 A API foi modelada **design-first**: o contrato é escrito antes do código e é a fonte da verdade do serviço.

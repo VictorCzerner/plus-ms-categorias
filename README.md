@@ -101,6 +101,30 @@ Para parar e remover os containers:
 docker compose down
 ```
 
+## Testes e Cobertura
+
+O projeto usa JUnit/Mockito nos testes e JaCoCo para relatÃ³rio de cobertura.
+
+Para rodar os testes e gerar o relatÃ³rio localmente:
+
+```powershell
+.\gradlew.bat test jacocoTestReport
+```
+
+No Linux/macOS:
+
+```bash
+./gradlew test jacocoTestReport
+```
+
+O relatÃ³rio HTML Ã© gerado em:
+
+```text
+build/reports/jacoco/test/html/index.html
+```
+
+No GitHub Actions, o workflow de CI executa testes e cobertura automaticamente e publica o relatÃ³rio HTML como artifact chamado `jacoco-coverage-report`.
+
 ## Contrato da API (Swagger / OpenAPI)
 
 A API foi modelada **design-first**: o contrato é escrito antes do código e é a fonte da verdade do serviço.

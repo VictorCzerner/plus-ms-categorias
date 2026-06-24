@@ -78,6 +78,24 @@ class CategoriaServiceTest {
             assertThat(response.content()).isEmpty();
             assertThat(response.totalElements()).isZero();
         }
+
+        @Test
+        @DisplayName("deve rejeitar número de página negativo antes de consultar o repositório")
+        void deveRejeitarPaginaNegativa() {
+            assertThatThrownBy(() -> categoriaService.listar(null, null, null, -1, 20))
+                    .isInstanceOf(IllegalArgumentException.class);
+
+            verifyNoInteractions(categoriaRepository);
+        }
+
+        @Test
+        @DisplayName("deve rejeitar tamanho de página igual a zero antes de consultar o repositório")
+        void deveRejeitarTamanhoZero() {
+            assertThatThrownBy(() -> categoriaService.listar(null, null, null, 0, 0))
+                    .isInstanceOf(IllegalArgumentException.class);
+
+            verifyNoInteractions(categoriaRepository);
+        }
     }
 
     @Nested
@@ -293,6 +311,65 @@ class CategoriaServiceTest {
                     .hasMessageContaining("pai dela mesma");
 
             verify(categoriaRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("deve lançar RecursoNaoEncontradoException quando nova categoria pai não existe")
+        void deveLancarExcecaoQuandoNovaCategoriaPaiNaoExiste() {
+            var request = new CategoriaRequest();
+            request.setNome("Camisetas");
+            request.setCategoriaPaiId(99L);
+
+            when(categoriaRepository.findByIdWithPai(1L)).thenReturn(Optional.of(categoriaExistente));
+            when(categoriaRepository.existsByNomeAndIdNot("Camisetas", 1L)).thenReturn(false);
+            when(categoriaRepository.findById(99L)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> categoriaService.atualizar(1L, request))
+                    .isInstanceOf(RecursoNaoEncontradoException.class)
+                    .hasMessageContaining("99");
+
+            verify(categoriaRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("deve assumir ativo true na atualização quando valor é nulo")
+        void deveAssumirAtivoTrueNaAtualizacaoQuandoNulo() {
+            var request = new CategoriaRequest();
+            request.setNome("Camisetas");
+            request.setAtivo(null);
+
+            categoriaExistente.setAtivo(false);
+            when(categoriaRepository.findByIdWithPai(1L)).thenReturn(Optional.of(categoriaExistente));
+            when(categoriaRepository.existsByNomeAndIdNot("Camisetas", 1L)).thenReturn(false);
+            when(categoriaRepository.save(any(Categoria.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            CategoriaResponse response = categoriaService.atualizar(1L, request);
+
+            assertThat(response.getAtivo()).isTrue();
+        }
+
+        @Test
+        @DisplayName("documenta comportamento atual que permite ciclo indireto na hierarquia")
+        void devePermitirCicloIndiretoNoComportamentoAtual() {
+            Categoria categoriaFilha = Categoria.builder()
+                    .id(2L)
+                    .nome("Manga Longa")
+                    .ativo(true)
+                    .categoriaPai(categoriaExistente)
+                    .build();
+            var request = new CategoriaRequest();
+            request.setNome("Camisetas");
+            request.setCategoriaPaiId(2L);
+
+            when(categoriaRepository.findByIdWithPai(1L)).thenReturn(Optional.of(categoriaExistente));
+            when(categoriaRepository.existsByNomeAndIdNot("Camisetas", 1L)).thenReturn(false);
+            when(categoriaRepository.findById(2L)).thenReturn(Optional.of(categoriaFilha));
+            when(categoriaRepository.save(any(Categoria.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            CategoriaResponse response = categoriaService.atualizar(1L, request);
+
+            assertThat(response.getCategoriaPaiId()).isEqualTo(2L);
+            assertThat(categoriaFilha.getCategoriaPai()).isSameAs(categoriaExistente);
         }
     }
 
